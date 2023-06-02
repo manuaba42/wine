@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:percent_indicator/percent_indicator.dart';
+import 'package:flutter/rendering.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -15,6 +16,14 @@ class _HomePageState extends State<HomePage> {
   List _listdata = [];
   bool _isloading = true;
 
+  int _counter = 0;
+  late ScrollController _hideButtonController;
+  void _incrementCounter() {
+    setState(() {
+      _counter++;
+    });
+  }
+  var _isVisible;
   Future _getdata() async{
     try {
       final response = await http.get(Uri.parse("http://192.168.50.56/wine/read.php"));
@@ -32,10 +41,40 @@ class _HomePageState extends State<HomePage> {
   }
 
   @override
-  void initState() {
-    _getdata();
-    print(_listdata);
+  // void initState() {
+  //   _getdata();
+  //   print(_listdata);
+  //   super.initState();
+  // }
+
+  void initState(){
     super.initState();
+    _isVisible = true;
+    _hideButtonController = new ScrollController();
+    _hideButtonController.addListener((){
+      if(_hideButtonController.position.userScrollDirection == ScrollDirection.reverse){
+        if(_isVisible == true) {
+            /* only set when the previous state is false
+             * Less widget rebuilds 
+             */
+            print("**** ${_isVisible} up"); //Move IO away from setState
+            setState((){
+              _isVisible = false;
+            });
+        }
+      } else {
+        if(_hideButtonController.position.userScrollDirection == ScrollDirection.forward){
+          if(_isVisible == false) {
+              /* only set when the previous state is false
+               * Less widget rebuilds 
+               */
+               print("**** ${_isVisible} down"); //Move IO away from setState
+               setState((){
+                 _isVisible = true;
+               });
+           }
+        }
+    }});
   }
   @override
   // Widget build(BuildContext context) {
@@ -55,10 +94,13 @@ class _HomePageState extends State<HomePage> {
   //       ),
   //   );
   // }
+  bool _showFab = true;
 
   Widget build(BuildContext context) {
+    const duration = Duration(milliseconds: 300);
     return Scaffold(
       body: SingleChildScrollView(
+        controller: _hideButtonController,
         padding: EdgeInsets.only(top: 20),
         child: Column(
           children: <Widget>[
@@ -76,22 +118,18 @@ class _HomePageState extends State<HomePage> {
             foodPairing(),
             space(),
             review(),
+            space(),
           ],
         ),
       ),
-      floatingActionButton: 
-      Padding(padding: EdgeInsets.only(bottom: 5.0),
-      child: Container(
-        width: 400,
-        height: 50,
-        child: 
-          FloatingActionButton.extended(
-            onPressed: () {},
-            // icon: Icon(Icons.save),
-            label: Text("Add to Cart"),
-          ),
-      )
-      )
+      floatingActionButton: new Visibility( 
+        visible: _isVisible,
+        child: new FloatingActionButton(
+          onPressed: _incrementCounter,
+          tooltip: 'Increment',
+          child: new Icon(Icons.add),
+        ),     
+      ),
       // floatingActionButton: FloatingActionButton(
       //   child: Icon(Icons.add),
       //   onPressed: () {},
@@ -155,13 +193,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  var description =
-    Container(child: Text(
-      "A style icon gets some love from one of today's top trendsetters. Pharrell Williams puts his creative spin on these shoes, which have all the clean, classicdetails of the beloved Stan Smith.",
-      textAlign: TextAlign.justify,
-      style: TextStyle(height: 1.5, color: Color(0xFF6F8398)),
-    ),
-    );
+  final String description =  "A style icon gets some love from one of today's top trendsetters. Pharrell Williams puts his creative spin on these shoes, which have all the clean, classicdetails of the beloved Stan Smith.";
 
   Widget Property(){
       return Container(
@@ -303,7 +335,7 @@ class _HomePageState extends State<HomePage> {
       padding: EdgeInsets.only(left: 16, right: 16),
       child: Column(
         children: [
-          description,
+          ExpandableText(description),
           const SizedBox(height: 9,),
           Row(
             children: [
@@ -352,9 +384,8 @@ class _HomePageState extends State<HomePage> {
       padding: EdgeInsets.only(left: 16, right: 16),
       child: Column(children: [
         Text("Taste Notes", textAlign: TextAlign.left, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),),
-        Text("Deep red. Nose dominated by notes of ripe red fruit with some hints of strawberry jam and raspberry, combined with nuances of spice. So well integrated, there are notes of toasted barrels of high quality, giving a greedy character to wine, with aromas of vanilla and brioche. In the mouth, it confirms the fruity aromas in harmony with this structure but elegant.", textAlign: TextAlign.justify,
-      style: TextStyle(height: 1.5, color: Color(0xFF6F8398))),
-            bar(),
+        ExpandableText("Deep red. Nose dominated by notes of ripe red fruit with some hints of strawberry jam and raspberry, combined with nuances of spice. So well integrated, there are notes of toasted barrels of high quality, giving a greedy character to wine, with aromas of vanilla and brioche. In the mouth, it confirms the fruity aromas in harmony with this structure but elegant."),
+        bar(),
 
       ]),
     );
@@ -363,6 +394,8 @@ class _HomePageState extends State<HomePage> {
   Widget bar() {
     return Container(
       child: 
+      Center(
+        child: 
         Column(
             children: <Widget>[
               Padding(
@@ -427,6 +460,7 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
         )
+      )
     );
   }
 
@@ -573,5 +607,39 @@ class _HomePageState extends State<HomePage> {
           ),
       ]),
     ); 
+  }
+}
+
+class ExpandableText extends StatefulWidget {
+  ExpandableText(this.text);
+
+  final String text;
+  bool isExpanded = false;
+
+  @override
+  _ExpandableTextState createState() => new _ExpandableTextState();
+}
+
+class _ExpandableTextState extends State<ExpandableText> {
+  @override
+  Widget build(BuildContext context) {
+    return new Column(children: <Widget>[
+      new ConstrainedBox(
+          constraints: widget.isExpanded
+              ? new BoxConstraints()
+              : new BoxConstraints(maxHeight: 50.0),
+          child: new Text(
+            widget.text,
+            softWrap: true,
+            overflow: TextOverflow.fade,
+            textAlign: TextAlign.justify,
+            style: TextStyle(height: 1.5, color: Color(0xFF6F8398))
+          )),
+      widget.isExpanded
+          ? new Container()
+          : new TextButton(
+              child: const Text('Read more'),
+              onPressed: () => setState(() => widget.isExpanded = true))
+    ]);
   }
 }
